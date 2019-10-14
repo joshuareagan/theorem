@@ -251,6 +251,11 @@ class Derivation(object):
 
         for row in self.rows:
 
+            n = row.number // 10
+            if n == 0: gap = "  "
+            elif n < 10: gap = " "
+            else: gap = ""
+
             scope_lines_string = ""
             for _ in range(row.s_lines):
                 scope_lines_string += " |"
@@ -261,8 +266,9 @@ class Derivation(object):
 
             citations_string = citations_string[:-2]
 
-            result += "{}. {} {}    {} {}\n".format(
+            result += "{}.{}{} {}    {} {}\n".format(
                 row.number,
+                gap,
                 scope_lines_string,
                 row.sentence,
                 row.rule,
