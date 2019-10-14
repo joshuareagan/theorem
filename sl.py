@@ -14,7 +14,7 @@
 from FregeKit import Sentence, Derivation, Ion, Atom, Negation, Binary
 
 # The input sentence.
-sl_sentence = "((A -> B) & (B -> C)) -> (A -> C)"
+sl_sentence = "(A v (~B v C))"
 
 # Create a new derivation.
 derivation = Derivation()
