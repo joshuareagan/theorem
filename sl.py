@@ -29,6 +29,95 @@ def main():
         completed = derive(sent_obj)
         if completed: print(derivation)
 
+def derive(sentence):
+    """
+    Attempt to derive a given sentence. If this can't be
+    done, return a counterexample.
+    """
+    # Assume the opposite
+    next_sent = Negation(sentence)
+    assume(next_sent)
+
+    # Convert sentence to disjunctive normal form (DNF)
+    dnf_sent = dnf(next_sent)
+
+    # Check for a counterexample.
+    ce_found, ce = find_ce(dnf_sent)
+
+    if ce_found:
+        print("Counterexample found:")
+        for char in ce:
+            print("    {}: {}".format(char, ce[char]))
+        return False
+
+    else:
+        # No CE exists, so complete the derivation.
+        print("Success!")
+        reductio(dnf_sent, None)
+        return True
+
+def dnf(sentence):
+    """
+    Takes an SL sentence and returns an equivalent one 
+    that's in disjunctive normal form (DNF).
+    """
+    next_sent = remove_arrows(sentence)
+    next_sent = negation_push(next_sent)
+    next_sent = de_conjunctify(next_sent)
+    return next_sent
+
+def find_ce(dnf_sent):
+    """
+    Takes a DNF sentence and checks for a valuation that 
+    makes it true. If found, this valuation is returned.
+    """
+
+    # Break up sentence by disjunct
+    sent = str(dnf_sent)
+    disjuncts = sent.split("v")
+
+    # Check each disjunct for truth-making valuation.
+    for disjunct in disjuncts:
+        pos = set()
+        neg = set()
+
+        # Positive ions go in pos, negative ions in neg.
+        d_iter = iter(disjunct)        
+        for char in d_iter:
+            if char == "~":
+                neg.add(next(d_iter))
+            elif char.isalpha():
+                pos.add(char)
+     
+        # If an atom is affirmed and denied, e.g. P & ~P,
+        # there's no truth-making valuation.
+        if pos.intersection(neg): continue
+
+        # Counterexample found, return it
+        else:
+            counterexample = {}
+            for char in sent:
+                if char.isalpha() and char.isupper():
+                    counterexample[char] = False
+            for char in pos:
+                counterexample[char] = True
+
+            return True, counterexample
+
+    return False, None
+
+### Exchange functions
+#
+# These functions are for converting a sentence to 
+# disjunctive normal form.
+
+def remove_arrows(sentence):
+    """
+    Replaces any sentence with a logically equivalent
+    one lacking arrows, -> and <->.
+    """
+    return exchange_rule_loop(sentence, _remove_arrows)
+
 def _remove_arrows(sentence):
     """
     Check for arrows, -> and <->, and remove the first one
@@ -94,12 +183,21 @@ def exchange_rule_loop(sentence, func):
 
     return next_sent
 
-def remove_arrows(sentence):
+def negation_push(sentence):
     """
-    Replaces any sentence with a logically equivalent
-    one lacking arrows, -> and <->.
+    Takes an arrow-less sentence and returns an 
+    equivalent one whose negations only govern
+    atoms.
     """
-    return exchange_rule_loop(sentence, _remove_arrows)
+    return exchange_rule_loop(sentence, _negation_push)
+
+def de_conjunctify(sentence):
+    """
+    Takes an arrow-less sentence with negations pushed in,
+    and returns an equivalent sentence in which no 
+    conjunction governs a disjunction.
+    """
+    return exchange_rule_loop(sentence, _de_conjunctify)
 
 def _negation_push(sentence):
     """
@@ -168,14 +266,6 @@ def _negation_push(sentence):
             next_rhs, rule = _negation_push(rhs)
             return Binary(kind, lhs, next_rhs), rule
 
-def negation_push(sentence):
-    """
-    Takes an arrow-less sentence and returns an 
-    equivalent one whose negations only govern
-    atoms.
-    """
-    return exchange_rule_loop(sentence, _negation_push)
-
 def _de_conjunctify(sentence):
     """
     If a conjunction governs a disjunction, exchange for
@@ -226,63 +316,62 @@ def _de_conjunctify(sentence):
         else:
             return sentence, None
 
-def de_conjunctify(sentence):
-    """
-    Takes an arrow-less sentence with negations pushed in,
-    and returns an equivalent sentence in which no 
-    conjunction governs a disjunction.
-    """
-    return exchange_rule_loop(sentence, _de_conjunctify)
+### Reductio ad absurdum
+#
+# This is the main function for completing the derivation
+# after it's in DNF.
 
-def dnf(sentence):
+def reductio(sentence, goal):
     """
-    Takes an SL sentence and returns an equivalent one 
-    that's in disjunctive normal form (DNF).
+    Given a DNF sentence w/o a counterexample, work to a 
+    contradiction and derive the opposite, completing the 
+    derivation.
     """
-    next_sent = remove_arrows(sentence)
-    next_sent = negation_push(next_sent)
-    next_sent = de_conjunctify(next_sent)
-    return next_sent
+    kind = sentence.kind
 
-def find_ce(dnf_sent):
-    """
-    Takes a DNF sentence and checks for a valuation that 
-    makes it true. If found, this valuation is returned.
-    """
+    if kind == "Atom" or kind == "Negation":
+        return contra_check(sentence, goal)
 
-    # Break up sentence by disjunct
-    sent = str(dnf_sent)
-    disjuncts = sent.split("v")
+    if kind == "Disjunction":
+        next_sent = v_elim(sentence.lhs, sentence.rhs)
+        next_sent = arrow_intro(next_sent)
+        return reductio(next_sent, None)
 
-    # Check each disjunct for truth-making valuation.
-    for disjunct in disjuncts:
-        pos = set()
-        neg = set()
+    if kind == "Conjunction":
+        return and_elim(sentence.lhs, sentence.rhs, goal)
 
-        # Positive ions go in pos, negative ions in neg.
-        d_iter = iter(disjunct)        
-        for char in d_iter:
-            if char == "~":
-                neg.add(next(d_iter))
-            elif char.isalpha():
-                pos.add(char)
-     
-        # If an atom is affirmed and denied, e.g. P & ~P,
-        # there's no truth-making valuation.
-        if pos.intersection(neg): continue
-
-        # Counterexample found, return it
+    if kind == "Conditional":
+        if len(derivation.scopes) == 0:
+            return neg_elim(sentence.lhs)
         else:
-            counterexample = {}
-            for char in sent:
-                if char.isalpha() and char.isupper():
-                    counterexample[char] = False
-            for char in pos:
-                counterexample[char] = True
+            return sentence
 
-            return True, counterexample
+def contra_check(sentence, goal):
+    """
+    Checks whether contradictory ions have been derived,
+    e.g. P and ~P.
+    """
+    number = derivation.lastnum()
+    valence = sentence.kind == "Atom"
+    char = sentence.body if valence else sentence.body.body
 
-    return False, None
+    derivation.add_ion(Ion(number, valence, char))
+
+    for scope in derivation.scopes:
+        for ion in scope.ions:
+            if ion.char == char and ion.valence != valence:
+
+                next_sent = and_intro(char, ion.number, number)
+                if goal and next_sent != goal:
+                    # From a contradiciton, anything follows.
+                    derivation.exchange(goal, "Any Contra.")
+                    next_sent = goal
+                    goal = None
+
+                next_sent = arrow_intro(next_sent)
+                return reductio(next_sent, goal)
+
+    return sentence
 
 ### Rules
 #
@@ -356,85 +445,6 @@ def neg_elim(sentence):
     """(~P -> (Q & ~Q)) => P"""
     derivation.exchange(sentence.body, "~ elim.")
     return sentence.body
-
-def contra_check(sentence, goal):
-    """
-    Checks whether contradictory ions have been derived,
-    e.g. P and ~P.
-    """
-    number = derivation.lastnum()
-    valence = sentence.kind == "Atom"
-    char = sentence.body if valence else sentence.body.body
-
-    derivation.add_ion(Ion(number, valence, char))
-
-    for scope in derivation.scopes:
-        for ion in scope.ions:
-            if ion.char == char and ion.valence != valence:
-
-                next_sent = and_intro(char, ion.number, number)
-                if goal and next_sent != goal:
-                    # From a contradiciton, anything follows.
-                    derivation.exchange(goal, "Any Contra.")
-                    next_sent = goal
-                    goal = None
-
-                next_sent = arrow_intro(next_sent)
-                return reductio(next_sent, goal)
-
-    return sentence
-
-def reductio(sentence, goal):
-    """
-    Given a DNF sentence w/o a counterexample, work to a 
-    contradiction and derive the opposite, completing the 
-    derivation.
-    """
-    kind = sentence.kind
-
-    if kind == "Atom" or kind == "Negation":
-        return contra_check(sentence, goal)
-
-    if kind == "Disjunction":
-        next_sent = v_elim(sentence.lhs, sentence.rhs)
-        next_sent = arrow_intro(next_sent)
-        return reductio(next_sent, None)
-
-    if kind == "Conjunction":
-        return and_elim(sentence.lhs, sentence.rhs, goal)
-
-    if kind == "Conditional":
-        if len(derivation.scopes) == 0:
-            return neg_elim(sentence.lhs)
-        else:
-            return sentence 
-
-def derive(sentence):
-    """
-    Attempt to derive a given sentence. If this can't be
-    done, return a counterexample.
-    """
-    # Assume the opposite
-    next_sent = Negation(sentence)
-    assume(next_sent)
-
-    # Convert sentence to disjunctive normal form (DNF)
-    dnf_sent = dnf(next_sent)
-
-    # Check for a counterexample.
-    ce_found, ce = find_ce(dnf_sent)
-
-    if ce_found:
-        print("Counterexample found:")
-        for char in ce:
-            print("    {}: {}".format(char, ce[char]))
-        return False
-
-    else:
-        # No CE exists, so complete the derivation.
-        print("Success!")
-        reductio(dnf_sent, None)
-        return True
 
 if __name__ == "__main__":
     main()
