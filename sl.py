@@ -289,16 +289,10 @@ def _de_conjunctify(sentence):
         if next_rhs != rhs:
             return Binary(kind, lhs, next_rhs), rule
 
-        if kind == "Disjunction":
+        elif kind == "Disjunction":
             return sentence, None
 
         # Conjunction case
-        if (
-               (lhs.kind == "Atom" or lhs.kind == "Negation")
-               and (rhs.kind == "Atom" or rhs.kind == "Negation")
-           ):
-            return sentence, None
-
         elif lhs.kind == "Disjunction":
             # Exchange ((P v Q) & R) for ((P & R) v (Q & R))
             return Binary("Disjunction",
