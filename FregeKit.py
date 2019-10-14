@@ -72,40 +72,35 @@ class Sentence(object):
                 elif bracketStack == 0:
                     if char == ")": return False
 
-                    # conjunctions and disjunctions
-                    if char == "&" or char == "v":
+                    if char in {"&", "v", "-", "<"}:
+                        # Main connective found
                         lhs = self._sentify(s_inner[0:i])
-                        rhs = self._sentify(s_inner[i+1:])
-                        if not (lhs and rhs): return False
-                        elif char == "&": kind = "Conjunction"
-                        else: kind = "Disjunction"
-                        return Binary(kind, lhs, rhs)
 
-                    # conditionals
-                    elif char == "-":
+                        if char == "&":
+                           kind = "Conjunction"
+                           rhs = self._sentify(s_inner[i+1:])
 
-                        if ((len(s_inner) < i + 1) or
-                            (s_inner[i+1] != ">")):
-                            return False
+                        elif char == "v":
+                            kind = "Disjunction"
+                            rhs = self._sentify(s_inner[i+1:])
 
-                        lhs = self._sentify(s_inner[0:i])
-                        rhs = self._sentify(s_inner[i+2:])
+                        elif char == "-":
+                            kind = "Conditional"
+                            if ((len(s_inner) < i + 1) or
+                                (s_inner[i+1] != ">")):
+                                return False
+                            rhs = self._sentify(s_inner[i+2:])
+
+                        else:
+                            kind = "Biconditional"
+                            if ((len(s_inner) < i + 2) or
+                                (s_inner[i+1:i+3] != "->")):
+                                return False
+                            rhs = self._sentify(s_inner[i+3:])
+
                         if not (lhs and rhs): return False
                         else:
-                            return Binary("Conditional", lhs, rhs)
-
-                    # biconditionals
-                    elif char == "<":
-
-                        if ((len(s_inner) < i + 2) or
-                            (s_inner[i+1:i+3] != "->")):
-                            return False
-
-                        lhs = self._sentify(s_inner[0:i])
-                        rhs = self._sentify(s_inner[i+3:])
-                        if not (lhs and rhs): return False
-                        else:
-                            return Binary("Biconditional", lhs, rhs)
+                            return Binary(kind, lhs, rhs)
 
         else:
             return False

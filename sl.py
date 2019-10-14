@@ -14,7 +14,7 @@
 from FregeKit import Sentence, Derivation, Ion, Atom, Negation, Binary
 
 # The input sentence.
-sl_sentence = "(((A -> B) -> A) -> A)"
+sl_sentence = "(A -> B) -> (~B -> ~A)"
 
 # Create a new derivation.
 derivation = Derivation()
@@ -360,6 +360,7 @@ def contra_check(sentence, goal):
     for scope in derivation.scopes:
         for ion in scope.ions:
             if ion.char == char and ion.valence != valence:
+                # Contradiction found
 
                 next_sent = and_intro(char, ion.number, number)
                 if goal and next_sent != goal:
