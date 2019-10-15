@@ -118,6 +118,20 @@ def remove_arrows(sentence):
     """
     return exchange_rule_loop(sentence, _remove_arrows)
 
+def exchange_rule_loop(sentence, func):
+    """
+    Applies exchange rules repeatedly until they no 
+    longer apply.
+    """
+    next_sent, rule = func(sentence)
+
+    while next_sent != sentence:
+        derivation.exchange(next_sent, rule)
+        sentence = next_sent
+        next_sent, rule = func(sentence)
+
+    return next_sent
+
 def _remove_arrows(sentence):
     """
     Check for arrows, -> and <->, and remove the first one
@@ -138,20 +152,13 @@ def _remove_arrows(sentence):
 
     # Binary connective sentence
     else:
-
-        # First check the subsentences for arrows.
         lhs, rhs = sentence.lhs, sentence.rhs
-        next_lhs, rule = _remove_arrows(lhs)
 
-        if next_lhs != lhs:
-            return Binary(kind, next_lhs, rhs), rule
-
-        next_rhs, rule = _remove_arrows(rhs)
-
-        if next_rhs != rhs:
-            return Binary(kind, lhs, next_rhs), rule
-
-        # The subsentences have no arrows.
+        # Check the subsentences for arrows.
+        next_sent, rule = subsent_check(sentence, _remove_arrows)
+        if rule: return next_sent, rule
+        
+        # Check the main connective for arrow.
         if kind == "Conditional":
 
             # Exchange (P -> Q) for (~P v Q)
@@ -169,19 +176,21 @@ def _remove_arrows(sentence):
         else:
             return sentence, None
 
-def exchange_rule_loop(sentence, func):
+def subsent_check(sentence, func):
     """
-    Applies exchange rules repeatedly until they no 
-    longer apply.
+    Helper function for DNF functions. Takes a binary 
+    sentence and checks whether an exchange function,
+    func(), applies to either of its subsentences.
     """
-    next_sent, rule = func(sentence)
+    kind, lhs, rhs = sentence.kind, sentence.lhs, sentence.rhs
 
-    while next_sent != sentence:
-        derivation.exchange(next_sent, rule)
-        sentence = next_sent
-        next_sent, rule = func(sentence)
+    next_lhs, rule = func(lhs)
+    if rule: return Binary(kind, next_lhs, rhs), rule
 
-    return next_sent
+    next_rhs, rule = func(rhs)
+    if rule: return Binary(kind, lhs, next_rhs), rule
+
+    return sentence, None
 
 def negation_push(sentence):
     """
@@ -190,14 +199,6 @@ def negation_push(sentence):
     atoms.
     """
     return exchange_rule_loop(sentence, _negation_push)
-
-def de_conjunctify(sentence):
-    """
-    Takes an arrow-less sentence with negations pushed in,
-    and returns an equivalent sentence in which no 
-    conjunction governs a disjunction.
-    """
-    return exchange_rule_loop(sentence, _de_conjunctify)
 
 def _negation_push(sentence):
     """
@@ -228,31 +229,27 @@ def _negation_push(sentence):
                 # Exchange ~~P for P.
                 return inner_body, "~~ elim."
 
-        # Negation of binary connective: ~(P & Q) or ~(P V Q)
+        # Negation of binary connective: ~(P & Q) or ~(P v Q)
         else:
             lhs, rhs = body.lhs, body.rhs
 
-            next_lhs, rule = _negation_push(lhs)
-            if next_lhs != lhs:
-                return Negation(Binary(inner_kind, next_lhs, rhs)), rule
+            # Check the negations in the subsentences.
+            next_sent, rule = subsent_check(body, _negation_push)
+            if rule: return Negation(next_sent), rule
 
-            next_rhs, rule = _negation_push(rhs)
-            if next_rhs != rhs:
-                return Negation(Binary(inner_kind, lhs, next_rhs)), rule
-
-            if inner_kind == "Conjunction":
+            # Apply De Morgan's rule
+            elif inner_kind == "Conjunction":
                 # Exchange ~(P & Q) for (~P v ~Q)
-                next_sent = Binary("Disjunction", 
-                                      Negation(lhs),
-                                      Negation(rhs)
-                                  )
-            elif inner_kind == "Disjunction":
+                return Binary("Disjunction", 
+                                 Negation(lhs),
+                                 Negation(rhs)
+                             ), "De Morgan's"
+            else:
                 # Exchange ~(P v Q) for (~P & ~Q)
-                next_sent = Binary("Conjunction", 
-                                      Negation(lhs),
-                                      Negation(rhs)
-                                  )
-            return next_sent, "De Morgan's"
+                return Binary("Conjunction", 
+                                 Negation(lhs),
+                                 Negation(rhs)
+                             ), "De Morgan's"
 
     # Binary connective case
     else:
@@ -265,6 +262,14 @@ def _negation_push(sentence):
         else:
             next_rhs, rule = _negation_push(rhs)
             return Binary(kind, lhs, next_rhs), rule
+
+def de_conjunctify(sentence):
+    """
+    Takes an arrow-less sentence with negations pushed in,
+    and returns an equivalent sentence in which no 
+    conjunction governs a disjunction.
+    """
+    return exchange_rule_loop(sentence, _de_conjunctify)
 
 def _de_conjunctify(sentence):
     """
@@ -279,15 +284,10 @@ def _de_conjunctify(sentence):
     # Binary connective case
     else:
         lhs, rhs = sentence.lhs, sentence.rhs
-        next_lhs, rule = _de_conjunctify(lhs)
 
-        if next_lhs != lhs:
-            return Binary(kind, next_lhs, rhs), rule
-
-        next_rhs, rule = _de_conjunctify(rhs)
-
-        if next_rhs != rhs:
-            return Binary(kind, lhs, next_rhs), rule
+        # Check the subsentences.
+        next_sent, rule = subsent_check(sentence, _de_conjunctify)
+        if rule: return next_sent, rule
 
         elif kind == "Disjunction":
             return sentence, None
@@ -358,7 +358,7 @@ def contra_check(sentence, goal):
 
                 next_sent = and_intro(char, ion.number, number)
                 if goal and next_sent != goal:
-                    # From a contradiciton, anything follows.
+                    # From a contradiction, anything follows.
                     derivation.exchange(goal, "Any Contra.")
                     next_sent = goal
                     goal = None
