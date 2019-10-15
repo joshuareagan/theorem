@@ -14,7 +14,7 @@
 from FregeKit import sentify, Derivation, Ion, Atom, Negation, Binary
 
 # The input sentence.
-sl_sentence = "(A -> B) -> (~B -> ~A)"
+sl_sentence = "(A -> ~B) -> (~B -> ~A)"
 
 # Create a new derivation.
 derivation = Derivation()
@@ -92,19 +92,24 @@ def find_ce(dnf_sent):
         # If an atom is affirmed and denied, e.g. P & ~P,
         # there's no truth-making valuation.
         if pos.intersection(neg): continue
-
-        # Counterexample found, return it
-        else:
-            counterexample = {}
-            for char in sent:
-                if char.isalpha() and char.isupper():
-                    counterexample[char] = False
-            for char in pos:
-                counterexample[char] = True
-
-            return True, counterexample
+        else: return found_ce(sent, pos)
 
     return False, None
+
+def found_ce(sentence, pos):
+    """
+    A disjunct has been found that can be made True.
+    Construct a valuation and return it. It's a
+    counterexample to the input SL sentence.
+    """
+    counterexample = {}
+    for char in sentence:
+        if char.isalpha() and char.isupper():
+            counterexample[char] = False
+    for char in pos:
+        counterexample[char] = True
+
+    return True, counterexample
 
 ### Exchange functions
 #
@@ -346,19 +351,25 @@ def contra_check(sentence, goal):
     for scope in derivation.scopes:
         for ion in scope.ions:
             if ion.char == char and ion.valence != valence:
-                # Contradiction found
-
-                next_sent = and_intro(char, ion.number, number)
-                if goal and next_sent != goal:
-                    # From a contradiction, anything follows.
-                    derivation.exchange(goal, "Any Contra.")
-                    next_sent = goal
-                    goal = None
-
-                next_sent = arrow_intro(next_sent)
-                return reductio(next_sent, goal)
+                return contra_found(char, ion.number, number, goal)
 
     return sentence
+
+def contra_found(char, cite_1, cite_2, goal):
+    """
+    A contradiction has been found, so combine the 
+    contradictory sentences with & intro, then discharge
+    the last assumption made with an arrow_intro().
+    """
+    next_sent = and_intro(char, cite_1, cite_2)
+    if goal and next_sent != goal:
+        # From a contradiction, anything follows.
+        derivation.exchange(goal, "Any Contra.")
+        next_sent = goal
+        goal = None
+
+    next_sent = arrow_intro(next_sent)
+    return reductio(next_sent, goal)
 
 ### Rules
 #
