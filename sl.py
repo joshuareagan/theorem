@@ -253,15 +253,7 @@ def _negation_push(sentence):
 
     # Binary connective case
     else:
-        lhs, rhs = sentence.lhs, sentence.rhs
-        next_lhs, rule = _negation_push(lhs)
-
-        if next_lhs != lhs:
-            return Binary(kind, next_lhs, rhs), rule
-
-        else:
-            next_rhs, rule = _negation_push(rhs)
-            return Binary(kind, lhs, next_rhs), rule
+        return subsent_check(sentence, _negation_push)
 
 def de_conjunctify(sentence):
     """
