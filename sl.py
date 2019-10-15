@@ -11,7 +11,7 @@
 # program should give an appropriate answer for any valid 
 # input value. (Assuming no bugs!)
 
-from FregeKit import Sentence, Derivation, Ion, Atom, Negation, Binary
+from FregeKit import sentify, Derivation, Ion, Atom, Negation, Binary
 
 # The input sentence.
 sl_sentence = "(A -> B) -> (~B -> ~A)"
@@ -21,7 +21,7 @@ derivation = Derivation()
 
 def main():
 
-    sent_obj = Sentence().sentify(sl_sentence)
+    sent_obj = sentify(sl_sentence)
     if not sent_obj:
         print("Not a sentence!")
     else:

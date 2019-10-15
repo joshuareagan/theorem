@@ -4,7 +4,9 @@
 # Very likely I will neglect it in favor of a library
 # for a language with a stricter type system.
 
-### Classes
+### Sentence Classes
+#
+#
 
 class Sentence(object):
     """
@@ -15,96 +17,6 @@ class Sentence(object):
     (~B v C)            :: Either not B or C
     (P <-> ~(A & B))    :: P if and only if not (A and B)
     """
-
-    def sentify(self, s):
-        """
-        Method for parsing sentence strings into Sentence 
-        objects. Returns False if the parse fails.
-        """
-
-        next_sent = self._sentify(s)
-        if next_sent:
-            return next_sent
-        else:
-            return self._sentify("("+s+")")
-
-    def _sentify(self, s):
-        """
-        Helper function for sentify; this one
-        does most of the work. The structure is 
-        recursive, to mirror the recursive definition
-        of an SL sentence.
-        """
-
-        # Remove whitespace
-        s = "".join(s.split())
-
-        # Atomic sentence
-        if len(s) == 1:
-            if not (s.isupper() and s.isalpha()):
-                return False
-            else:
-                return Atom(s)
-
-        # Negation
-        elif s.startswith("~"):
-            next_sent = self._sentify(s[1:])
-
-            if not next_sent: return False
-            else:
-                return Negation(next_sent)
-
-        # Binary connectives
-        elif s.startswith("(") and s.endswith(")"):
-
-            s_inner = s[1:-1]
-            bracketStack= 0
-
-            # Iterate over all chars in the string
-            # looking for the main connective.
-            for i, char in enumerate(s_inner):
-                if char == "(":
-                    bracketStack += 1
-
-                elif char == ")":
-                    bracketStack -= 1
-
-                elif bracketStack == 0:
-                    if char == ")": return False
-
-                    if char in {"&", "v", "-", "<"}:
-                        # Main connective found
-                        lhs = self._sentify(s_inner[0:i])
-
-                        if char == "&":
-                           kind = "Conjunction"
-                           rhs = self._sentify(s_inner[i+1:])
-
-                        elif char == "v":
-                            kind = "Disjunction"
-                            rhs = self._sentify(s_inner[i+1:])
-
-                        elif char == "-":
-                            kind = "Conditional"
-                            if ((len(s_inner) < i + 1) or
-                                (s_inner[i+1] != ">")):
-                                return False
-                            rhs = self._sentify(s_inner[i+2:])
-
-                        else:
-                            kind = "Biconditional"
-                            if ((len(s_inner) < i + 2) or
-                                (s_inner[i+1:i+3] != "->")):
-                                return False
-                            rhs = self._sentify(s_inner[i+3:])
-
-                        if not (lhs and rhs): return False
-                        else:
-                            return Binary(kind, lhs, rhs)
-
-        else:
-            return False
-
     def __eq__(self, other):
         """Test for sentence equality"""
 
@@ -145,6 +57,11 @@ class Sentence(object):
         else:
             return "String conversion Error"
 
+### Three kinds of Sentence
+#
+# Atoms, Negations, and those with 'Binary'
+# connectives.
+
 class Atom(Sentence):
     """Class for initializing atomic sentences."""
 
@@ -169,6 +86,10 @@ class Binary(Sentence):
         self.kind = kind
         self.lhs = lhs
         self.rhs = rhs
+
+### Derivations
+#
+# Classes for derivations.
 
 class Derivation(object):
     """
@@ -309,3 +230,96 @@ class Ion(object):
         self.valence = valence
         self.char = char
 
+### sentify and _sentify
+#
+# Useful functions for converting a string to
+# a Sentence object.
+
+def _sentify(s):
+    """
+    Helper function for sentify; this one
+    does most of the work. The structure is 
+    recursive, to mirror the recursive definition
+    of an SL sentence.
+    """
+
+    # Remove whitespace
+    s = "".join(s.split())
+
+    # Atomic sentence
+    if len(s) == 1:
+        if not (s.isupper() and s.isalpha()):
+            return False
+        else:
+            return Atom(s)
+
+    # Negation
+    elif s.startswith("~"):
+        next_sent = _sentify(s[1:])
+
+        if not next_sent: return False
+        else:
+            return Negation(next_sent)
+
+    # Binary connectives
+    elif s.startswith("(") and s.endswith(")"):
+
+        s_inner = s[1:-1]
+        bracketStack= 0
+
+        # Iterate over all chars in the string
+        # looking for the main connective.
+        for i, char in enumerate(s_inner):
+            if char == "(":
+                bracketStack += 1
+
+            elif char == ")":
+                bracketStack -= 1
+
+            elif bracketStack == 0:
+                if char == ")": return False
+
+                if char in {"&", "v", "-", "<"}:
+                    # Main connective found
+                    lhs = _sentify(s_inner[0:i])
+
+                    if char == "&":
+                       kind = "Conjunction"
+                       rhs = _sentify(s_inner[i+1:])
+
+                    elif char == "v":
+                        kind = "Disjunction"
+                        rhs = _sentify(s_inner[i+1:])
+
+                    elif char == "-":
+                        kind = "Conditional"
+                        if ((len(s_inner) < i + 1) or
+                            (s_inner[i+1] != ">")):
+                            return False
+                        rhs = _sentify(s_inner[i+2:])
+
+                    else:
+                        kind = "Biconditional"
+                        if ((len(s_inner) < i + 2) or
+                            (s_inner[i+1:i+3] != "->")):
+                            return False
+                        rhs = _sentify(s_inner[i+3:])
+
+                    if not (lhs and rhs): return False
+                    else:
+                        return Binary(kind, lhs, rhs)
+
+    else:
+        return False
+
+def sentify(s):
+    """
+    Function for parsing sentence strings into Sentence 
+    objects. Returns False if the parse fails.
+    """
+
+    next_sent = _sentify(s)
+    if next_sent:
+        return next_sent
+    else:
+        return _sentify("("+s+")")
